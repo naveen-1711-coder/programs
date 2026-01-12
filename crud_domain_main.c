@@ -24,7 +24,9 @@ void update_record(int, char*);
 int get_record_size(int);
 void load_fields(int);
 void close_record(int, int);
-int find_active_record(FILE*, int, char*, int*);
+int is_record_found(FILE*, int, char*, int*);
+int record_is_active(FILE*, int, char*, int*);
+int is_null(FILE*);
 
 int choice;
 char status;
@@ -83,6 +85,18 @@ void create_record(int field_count, char* value, int field_counter)
 		scanf("%19[^\n]", value);
 		clear_input_buffer();
 
+        if (field_counter == 0)
+        {
+            int record_start_position;
+
+            if (is_record_found(fp_data, field_count, value, &record_start_position))
+            {
+                printf("Record already exists\n\n");
+                fclose(fp_data);
+                return;
+            }
+        }
+
 		fwrite(value, SIZE, 1, fp_data);
 	}
 
@@ -97,15 +111,12 @@ void create_record(int field_count, char* value, int field_counter)
 void show_records(int field_count, char* value, int record_fields_size, int field_counter)
 {
     FILE *fp_data;
-    int record_start_positon, record_size;
-
-    record_size = get_record_size(field_count);
+    int record_start_positon;
 
     fp_data = fopen(DATA_FILE, "rb");
 
-    if (fp_data == NULL)
+    if (is_null(fp_data))
     {
-        printf(FILE_NOT_FOUND);
         return;
     }
 
@@ -120,10 +131,7 @@ void show_records(int field_count, char* value, int record_fields_size, int fiel
     		break;
     	}
 
-    	if (fread(&status, 1, 1, fp_data) != 1)
-    	{
-    		break;
-    	}
+    	fread(&status, 1, 1, fp_data);
 
     	if (status == ACTIVE)
     	{
@@ -151,9 +159,8 @@ void update_record(int field_count, char* value)
 
     fp_data = fopen(DATA_FILE, "rb+");
 
-    if (!fp_data)
+    if (is_null(fp_data))
     {
-        printf(FILE_NOT_FOUND);
         return;
     }
 
@@ -161,7 +168,7 @@ void update_record(int field_count, char* value)
     scanf("%19[^\n]", field_value);
     clear_input_buffer();
 
-    if (!find_active_record(fp_data, field_count, field_value, &record_start_position))
+    if (!record_is_active(fp_data, field_count, field_value, &record_start_position))
     {
         printf(RECORD_NOT_FOUND);
         fclose(fp_data);
@@ -206,9 +213,8 @@ void close_record(int field_count, int record_fields_size)
 
     fp_data = fopen(DATA_FILE, "rb+");
 
-    if (!fp_data)
+    if (is_null(fp_data))
     {
-        printf(FILE_NOT_FOUND);
         return;
     }
 
@@ -216,7 +222,7 @@ void close_record(int field_count, int record_fields_size)
     scanf("%19[^\n]", field_value);
     clear_input_buffer();
 
-    if (find_active_record(fp_data, field_count, field_value, &record_start_position))
+    if (record_is_active(fp_data, field_count, field_value, &record_start_position))
     {
         fseek(fp_data, record_start_position + record_fields_size, SEEK_SET);
 
@@ -239,9 +245,9 @@ int get_field_count()
     char fields[FIELD_SIZE];
     int field_count = 0;
 
-    if (fp_fields == NULL)
+    if (is_null(fp_fields))
     {
-        return 0;
+        return;
     }
 
     while (fgets(fields, FIELD_SIZE, fp_fields) != NULL)
@@ -270,13 +276,13 @@ void print_menu_options()
     fclose(fp_menu);
 }
 
-void load_fields(int count)
+void load_fields(int field_count)
 {
 	FILE *fp_fields = fopen(FIELDS_FILE, "r");
 	int counter;
-	field_names = (char**)malloc(count * sizeof(char*));
+	field_names = (char**)malloc(field_count * sizeof(char*));
 
-	for (counter = 0;counter < count; counter++)
+	for (counter = 0;counter < field_count; counter++)
 	{
 		field_names[counter] = (char*)malloc(FIELD_SIZE);
 
@@ -296,11 +302,10 @@ int get_record_position(FILE *fp_data)
 	return record_start_position;
 }
 
-int find_active_record(FILE *fp_data, int field_count, char *field_value, int *record_start_position)
+int is_record_found(FILE *fp_data, int field_count, char *field_value, int *record_start_position)
 {
     char value[SIZE];
-
-    rewind(fp_data);
+    int record_data_size = get_record_size(field_count) - SIZE;
 
     while (1)
     {
@@ -308,18 +313,43 @@ int find_active_record(FILE *fp_data, int field_count, char *field_value, int *r
 
         if (fread(value, SIZE, 1, fp_data) != 1)
         {
-			return 0; 
+			break; 
 		}
-        fseek(fp_data, (field_count - 1) * SIZE, SEEK_CUR);
 
-        if (fread(&status, 1, 1, fp_data) != 1)
+        if (strcmp(value, field_value) == 0)
         {
-            return 0;
+            return 1;
         }
 
-        if (status == ACTIVE && strcmp(value, field_value) == 0)
+        fseek(fp_data, record_data_size, SEEK_CUR);
+    }
+    return 0;
+}
+
+int record_is_active(FILE* fp_data, int field_count, char* field_value, int *record_start_position)
+{
+    int record_fields_size = (field_count - 1) * SIZE;
+
+    if (is_record_found(fp_data, field_count, field_value, record_start_position) == 1)
+    {
+        fseek(fp_data, *record_start_position + record_fields_size, SEEK_CUR);
+
+        fread(&status, 1, 1, fp_data);
+
+        if (status == ACTIVE)
         {
             return 1;
         }
     }
+return 0;
+}
+
+int is_null(FILE* file_pointer)
+{
+    if (file_pointer == NULL)
+    {
+        printf(FILE_NOT_FOUND);
+        return 1;
+    }
+    return 0;
 }
