@@ -1,0 +1,5 @@
+	Customer details
+
+Account number: 009876543567
+Account holder name: naveen kumar
+Account balance: 8000

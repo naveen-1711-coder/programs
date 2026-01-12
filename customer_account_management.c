@@ -12,26 +12,20 @@
 #include <string.h>
 #include <stdlib.h>
 #include "mytools.c"
-#define size 15
+#include "structure.c"
+#include "open_account_function.c"
+#include "show_records_function.c"
+#include "update_records.c"
+#define SIZE 15
+#define STATEMENT "Account not found!\n"
+#define WRONG_CHOICE "Entered a wrong choice\n"
 
-struct customer_account_details
-{
-	char customer_account_number[size];
-	char customer_name[size];
-	int account_balance;
-	char status;
-
-};
-
-void open_account();
-void show_records(int);
-void clear_input_buffer();
-void update_records();
 void update_name_or_balance(int, char*);
 void deposit_or_withdrawal(int, char*);
 void close_account();
 int is_exist(char*, int);
 int find_record(FILE *, char *, struct customer_account_details *);
+void seek_back(FILE*);
 
 FILE* fp_accounts;
 char* filename = "customers_account_records.dat";
@@ -42,7 +36,7 @@ const int ACTIVE_ACCOUNTS = 876;
 const int CLOSED_ACCOUNTS = 234;
 
 int record_size = sizeof(struct customer_account_details);
-char account_number[size];
+char account_number[SIZE];
 int choice;
 struct customer_account_details record;
 
@@ -82,186 +76,10 @@ void main()
 			exit(0);
 
 		default :
-			printf("Entered a wrong choice\n");
+			printf(WRONG_CHOICE);
 			break;
 		}
 	}while (1);
-}
-
-void open_account()
-{
-	struct customer_account_details customer;
-	printf("Reading account details of customer\n");
-	printf("Enter the account number: ");
-	scanf("%14[^\n]", customer.customer_account_number);
-	clear_input_buffer();
-
-	if (is_exist(customer.customer_account_number, ACCOUNT_NUMBER_EXIST))
-	{
-		printf("Account number already exists!\n");
-		return;
-	}
-
-	printf("Enter the account name: ");
-	scanf( "%14[^\n]", customer.customer_name);
-	clear_input_buffer();
-
-	printf("Enter the account balance: "); 
-	scanf("%d", &customer.account_balance);
-	clear_input_buffer();
-	customer.status = '1';
-
-	fp_accounts = fopen(filename, "ab");
-	fwrite(&customer, record_size, 1, fp_accounts);
-	fclose(fp_accounts);
-}
-
-void show_records(int mode)
-{
-    fp_accounts = fopen(filename, "rb");
-    printf("\tCustomer account records\n\n");
-    while (fread(&record, record_size, 1, fp_accounts) == 1)
-    {
-    	if ((record.status == '1' && mode == ACTIVE_ACCOUNTS) || (mode == CLOSED_ACCOUNTS && record.status == '0'))
-    	{
-        printf("Account number     : %s\n", record.customer_account_number);
-        printf("Account holder name: %s\n", record.customer_name);
-        printf("Account balance    : %d\n\n", record.account_balance);
- 		}  	
-    }
-    fclose(fp_accounts);
-}
-
-
-void update_records()
-{
-	printf("For updating fields in record\n");
-	printf("\nEnter the account number: ");
-	scanf(" %14[^\n]", account_number);
-
-	if (!is_exist(account_number, IS_ACTIVE))
-	{
-		printf("The given account number doesn't exist!\n\n");
-	}
-	else
-	{
-		do
-		{
-			printf("1. Update Name\n2. Update Balance\n3. Deposit Money\n4. Withdraw Money\n5. EXIT\n\n");
-			printf("Enter your choice: ");
-			scanf("%d", &choice);
-			clear_input_buffer();
-
-			switch (choice)
-			{
-				case 1 :
-					update_name_or_balance(choice, account_number);
-					break;
-
-				case 2 :
-					update_name_or_balance(choice, account_number);
-					break;
-
-				case 3 :
-					deposit_or_withdrawal(choice, account_number);
-					break;
-
-				case 4 :
-					deposit_or_withdrawal(choice, account_number);
-					break;
-
-				case 5 :
-					return;
-
-				default :
-					printf("Entered wrong choice");
-					break;
-			}
-		}while (1);
-	}
-}
-
-void update_name_or_balance(int choice, char* account_number)
-{
-    fp_accounts = fopen(filename, "rb+");
-
-	if (!find_record(fp_accounts, account_number, &record))
-    {
-        printf("Account not found\n");
-        fclose(fp_accounts);
-        return;
-    }
-
-    if (choice == 1)
-    {
-		printf("Enter new name: ");
-        scanf( "%14[^\n]", record.customer_name);
-        clear_input_buffer();
-	}
-	else if (choice == 2)
-	{
-		printf("Enter new balance: ");
-		scanf("%d", &record.account_balance);
-		clear_input_buffer();
-	}
-
-	fseek(fp_accounts, -record_size, SEEK_CUR);
-	fwrite(&record, record_size, 1, fp_accounts);
-	fclose(fp_accounts);
-}
-
-
-void deposit_or_withdrawal(int choice, char* account_number)
-{
-    fp_accounts = fopen(filename, "rb+");
-    int deposit_amount, withdraw_amount;
-
-    if (!find_record(fp_accounts, account_number, &record))
-    {
-        printf("Account not found\n");
-        fclose(fp_accounts);
-        return;
-    }
-
-	if (choice == 3)
-    {
-		printf("Enter deposit amount: ");
-		scanf("%d", &deposit_amount);
-		clear_input_buffer();
-
-		if (deposit_amount > 0)
-    	{
-    		record.account_balance += deposit_amount;
-		}
-		else
-		{
-    	printf("Invalid deposit amount\n");
-    	fclose(fp_accounts);
-    	return;
-    	}
-    }
-    else if (choice == 4)
-	{
-		printf("Enter withdraw amount: ");
-		scanf("%d", &withdraw_amount);
-		clear_input_buffer();
-
-		if (withdraw_amount <= record.account_balance && withdraw_amount > 0)
-        {
-			record.account_balance -= withdraw_amount;
-        }
-		else
-		{
-			printf("Insufficient balance\n");
-			fclose(fp_accounts);
-			return;
-		}
-
-	}
-
-	fseek(fp_accounts, -record_size, SEEK_CUR);
-	fwrite(&record, record_size, 1, fp_accounts);
-    fclose(fp_accounts);
 }
 
 void close_account()
@@ -275,7 +93,7 @@ void close_account()
 
     if (!find_record(fp_accounts, account_number, &record) || record.status != '1')
     {
-        printf("Account does not exist or already closed\n");
+        printf(STATEMENT);
         fclose(fp_accounts);
         return;
     }
@@ -287,7 +105,7 @@ void close_account()
     if (choice == 1)
     {
     	record.status = '0';
-        fseek(fp_accounts, -record_size, SEEK_CUR);
+		seek_back(fp_accounts);
         fwrite(&record, record_size, 1, fp_accounts);
         printf("Account closed successfully\n");	
     }
@@ -298,22 +116,20 @@ int is_exist(char* account_number, int mode)
 {
 	fp_accounts = fopen(filename, "rb");
 
-	while (fread(&record, record_size, 1, fp_accounts) == 1)
+	if (find_record(fp_accounts, account_number, &record))
 	{
-		if (strcmp(record.customer_account_number, account_number) == 0)
+		if (mode == ACCOUNT_NUMBER_EXIST)
 		{
-			if (mode == ACCOUNT_NUMBER_EXIST)
-			{
-				fclose(fp_accounts);
-				return 1;
-			}
-			else if (mode == IS_ACTIVE && record.status == '1')
-			{
-				fclose(fp_accounts);
-				return 1;
-			}
+			fclose(fp_accounts);
+			return 1;
+		}
+		else if (mode == IS_ACTIVE && record.status == '1')
+		{
+			fclose(fp_accounts);
+			return 1;
 		}
 	}
+	
 	fclose(fp_accounts);
 	return 0;
 }

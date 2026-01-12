@@ -16,9 +16,9 @@
 #define ACTIVE 'A'
 #define CLOSED 'C'
 
-void create_record(int, char*, int);
+void create_record(int, char*);
 void print_menu_options();
-void show_records(int, char*, int, int);
+void show_records(int, char*, int);
 int get_field_count();
 void update_record(int, char*);
 int get_record_size(int);
@@ -35,7 +35,6 @@ char **field_names;
 int main()
 {
 	int field_count = get_field_count();
-	int field_counter;
 	load_fields(field_count);
 	char value[SIZE];
 	int record_fields_size = field_count * SIZE;
@@ -50,11 +49,11 @@ int main()
 		switch (choice)
 		{
 			case 1 :
-				create_record(field_count, value, field_counter);
+				create_record(field_count, value);
 				break;
 
 			case 2 :
-				show_records(field_count, value, record_fields_size, field_counter);
+				show_records(field_count, value, record_fields_size);
 				break;
 			case 3 :
 				update_record(field_count, value);
@@ -72,9 +71,10 @@ int main()
 	return 0;
 }
 
-void create_record(int field_count, char* value, int field_counter)
+void create_record(int field_count, char* value)
 {
 	FILE *fp_data;
+    int field_counter;
 	fp_data = fopen(DATA_FILE, "ab");
 
 	printf("\nEnter details:\n");
@@ -105,13 +105,14 @@ void create_record(int field_count, char* value, int field_counter)
 
 	fclose(fp_data);
 
-    printf("Record created successfully\n");
+    printf("\nRecord created successfully\n\n");
 }
 
-void show_records(int field_count, char* value, int record_fields_size, int field_counter)
+void show_records(int field_count, char* value, int record_fields_size)
 {
     FILE *fp_data;
     int record_start_positon;
+    int field_counter;
 
     fp_data = fopen(DATA_FILE, "rb");
 
@@ -131,21 +132,24 @@ void show_records(int field_count, char* value, int record_fields_size, int fiel
     		break;
     	}
 
-    	fread(&status, 1, 1, fp_data);
+    	if(fread(&status, 1, 1, fp_data) != 1)
+        { 
+            break;
+        }
+    	   if (status == ACTIVE)
+    	   {
+                fseek(fp_data, record_start_positon, SEEK_SET);
 
-    	if (status == ACTIVE)
-    	{
-    		fseek(fp_data, record_start_positon, SEEK_SET);
+        	    for (field_counter = 0; field_counter < field_count; field_counter++)
+        	    {
+                    if(fread(value, SIZE, 1, fp_data) == 1)
+                    {
+        		        printf("%-20s : %s\n", field_names[field_counter], value);
+        	        }
+                }
+            }
 
-        	for (field_counter = 0; field_counter < field_count; field_counter++)
-        	{
-                fread(value, SIZE, 1, fp_data);
-        		printf("%-20s : %s\n", field_names[field_counter], value);
-        	}
-
-        	fread(&status, 1, 1, fp_data);
-        	printf("\n");
-		}
+        printf("\n");
 	}
 	fclose(fp_data);
 }
@@ -247,7 +251,8 @@ int get_field_count()
 
     if (is_null(fp_fields))
     {
-        return;
+        printf(FILE_NOT_FOUND);
+        return 0;
     }
 
     while (fgets(fields, FIELD_SIZE, fp_fields) != NULL)
@@ -305,7 +310,8 @@ int get_record_position(FILE *fp_data)
 int is_record_found(FILE *fp_data, int field_count, char *field_value, int *record_start_position)
 {
     char value[SIZE];
-    int record_data_size = get_record_size(field_count) - SIZE;
+    int record_data_size = (field_count - 1) * SIZE + sizeof(char);
+    rewind(fp_data);
 
     while (1)
     {
@@ -328,11 +334,11 @@ int is_record_found(FILE *fp_data, int field_count, char *field_value, int *reco
 
 int record_is_active(FILE* fp_data, int field_count, char* field_value, int *record_start_position)
 {
-    int record_fields_size = (field_count - 1) * SIZE;
+    int record_fields_size = field_count * SIZE;
 
     if (is_record_found(fp_data, field_count, field_value, record_start_position) == 1)
     {
-        fseek(fp_data, *record_start_position + record_fields_size, SEEK_CUR);
+        fseek(fp_data, *record_start_position + record_fields_size, SEEK_SET);
 
         fread(&status, 1, 1, fp_data);
 
